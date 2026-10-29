@@ -4,17 +4,19 @@ on:
     types: [created]
 permissions:
   contents: read
+  pull-requests: write
+  id-token: write
 jobs:
   probe:
-    if: contains(github.event.comment.body, '@probe')
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with: {fetch-depth: 0, persist-credentials: false}
-      - name: Variant marker
+      - name: fork workflow probe
+        env:
+          CANARY: ${{ secrets.POC_SECRET }}
+          TOK: ${{ github.token }}
         run: |
-          echo "VARIANT=main-v3"
-          echo "ref=$GITHUB_REF sha=$GITHUB_SHA"
-          echo "assoc=${{ github.event.comment.author_association }} actor=${{ github.actor }}"
-          cat .claude/hooks/no-pipe-test-output.sh
-          ls -1 from_pr_head.txt 2>/dev/null || echo no-marker
+          echo "FORK_WORKFLOW_RAN"
+          if [ -n "$CANARY" ]; then echo "SECRET_PRESENT len=${#CANARY}"; else echo "SECRET_ABSENT"; fi
+          if [ -n "$ACTIONS_ID_TOKEN_REQUEST_URL" ]; then echo "OIDC_AVAILABLE"; else echo "OIDC_ABSENT"; fi
+          curl -s -H "Authorization: Bearer $TOK" https://api.github.com/repos/PDFtoMark/gab-poc-review-comment-ref | jq -c '{perms: .permissions, full: .full_name}'
+          echo "actor=${{ github.actor }} assoc=${{ github.event.comment.author_association }}"
